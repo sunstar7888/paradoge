@@ -1,15 +1,19 @@
 const state = {
-  year: 1,
-  money: 120,
-  population: 50,
-  happiness: 60,
-  economy: 55,
-  environment: 70,
-  security: 65,
-  education: 50,
-  unemployment: 12,
-  history: [],
-  pending: [],
+  baseStats: {
+    money: 120,
+    population: 50,
+    happiness: 60,
+    economy: 55,
+    environment: 70,
+    security: 65,
+    education: 50,
+    unemployment: 12,
+  },
+  dynamic: {
+    year: 1,
+    history: [],
+    pending: [],
+  },
 };
 
 const statsConfig = [
@@ -22,6 +26,8 @@ const statsConfig = [
   { key: "education", label: "教育", max: 100 },
   { key: "unemployment", label: "失業率", max: 30, invert: true },
 ];
+
+const facilities = [];
 
 const policies = [
   {
@@ -169,31 +175,52 @@ function formatStat(key, value) {
 
 function applyEffect(effect) {
   Object.entries(effect).forEach(([key, delta]) => {
-    if (!(key in state)) return;
-    state[key] += delta;
+    if (!(key in state.baseStats)) return;
+    state.baseStats[key] += delta;
   });
 }
 
 function scheduleDelayed(policy) {
   if (!policy.delayed) return;
-  state.pending.push({
-    year: state.year + policy.delayed.after,
+  state.dynamic.pending.push({
+    year: state.dynamic.year + policy.delayed.after,
     effect: policy.delayed.effect,
     note: policy.delayed.note,
   });
 }
 
 function logMessage(message) {
-  state.history.unshift(message);
-  state.history = state.history.slice(0, 8);
-  logEl.textContent = state.history.join("\n");
+  state.dynamic.history.unshift(message);
+  state.dynamic.history = state.dynamic.history.slice(0, 8);
+  logEl.textContent = state.dynamic.history.join("\n");
+}
+
+function calculateFacilityTotals() {
+  const totals = Object.fromEntries(statsConfig.map((stat) => [stat.key, 0]));
+  facilities.forEach((facility) => {
+    if (!facility.effects) return;
+    Object.entries(facility.effects).forEach(([key, delta]) => {
+      if (!(key in totals)) return;
+      totals[key] += delta;
+    });
+  });
+  return totals;
+}
+
+function calculateEffectiveStats() {
+  const facilityTotals = calculateFacilityTotals();
+  const effectiveStats = Object.fromEntries(
+    statsConfig.map((stat) => [stat.key, state.baseStats[stat.key] + facilityTotals[stat.key]])
+  );
+  return { effectiveStats, facilityTotals };
 }
 
 function updateStats() {
   statsEl.innerHTML = "";
+  const { effectiveStats } = calculateEffectiveStats();
   statsConfig.forEach((stat) => {
     const node = statTemplate.content.cloneNode(true);
-    const value = Math.round(state[stat.key]);
+    const value = Math.round(effectiveStats[stat.key]);
     const labelEl = node.querySelector(".stat-label");
     const valueEl = node.querySelector(".stat-value");
     const fillEl = node.querySelector(".stat-fill");
@@ -210,7 +237,7 @@ function updateStats() {
     statsEl.appendChild(node);
   });
 
-  trendEl.textContent = `前年のまとめ: 人口 ${state.population} 万人、財政 ${state.money.toFixed(0)} 億。`;
+  trendEl.textContent = `前年のまとめ: 人口 ${effectiveStats.population} 万人、財政 ${effectiveStats.money.toFixed(0)} 億。`;
 }
 
 function renderPolicies() {
@@ -241,17 +268,17 @@ function labelFor(key) {
 }
 
 function resolvePending() {
-  const due = state.pending.filter((item) => item.year === state.year);
+  const due = state.dynamic.pending.filter((item) => item.year === state.dynamic.year);
   if (due.length === 0) return;
   due.forEach((item) => {
     applyEffect(item.effect);
     logMessage(`遅延効果: ${item.note}`);
   });
-  state.pending = state.pending.filter((item) => item.year !== state.year);
+  state.dynamic.pending = state.dynamic.pending.filter((item) => item.year !== state.dynamic.year);
 }
 
 function randomEvent() {
-  const candidates = events.filter((event) => event.condition(state));
+  const candidates = events.filter((event) => event.condition(state.baseStats));
   if (candidates.length === 0) {
     eventBoxEl.classList.add("empty");
     eventBoxEl.innerHTML = "<p>いまは静かな一年です。</p>";
@@ -280,28 +307,40 @@ function randomEvent() {
 }
 
 function normalize() {
-  state.money = clamp(state.money, 0, 240);
-  state.population = clamp(state.population, 10, 200);
-  state.happiness = clamp(state.happiness, 10, 100);
-  state.economy = clamp(state.economy, 10, 100);
-  state.environment = clamp(state.environment, 10, 100);
-  state.security = clamp(state.security, 10, 100);
-  state.education = clamp(state.education, 10, 100);
-  state.unemployment = clamp(state.unemployment, 2, 30);
+  state.baseStats.money = clamp(state.baseStats.money, 0, 240);
+  state.baseStats.population = clamp(state.baseStats.population, 10, 200);
+  state.baseStats.happiness = clamp(state.baseStats.happiness, 10, 100);
+  state.baseStats.economy = clamp(state.baseStats.economy, 10, 100);
+  state.baseStats.environment = clamp(state.baseStats.environment, 10, 100);
+  state.baseStats.security = clamp(state.baseStats.security, 10, 100);
+  state.baseStats.education = clamp(state.baseStats.education, 10, 100);
+  state.baseStats.unemployment = clamp(state.baseStats.unemployment, 2, 30);
 }
 
 function yearTick() {
-  state.year += 1;
-  turnEl.textContent = `${state.year}年目`;
+  state.dynamic.year += 1;
+  turnEl.textContent = `${state.dynamic.year}年目`;
 
-  const growth = (state.economy - state.unemployment + state.happiness) / 40;
-  state.population = clamp(state.population + growth, 10, 200);
-  state.money = clamp(state.money + (state.population * 0.4 + state.economy * 0.2 - 15), 0, 240);
-  state.happiness = clamp(state.happiness + (state.environment - 60) / 20 - (state.unemployment - 10) / 10, 10, 100);
-  state.security = clamp(state.security + (state.unemployment < 12 ? 2 : -2), 10, 100);
+  const growth = (state.baseStats.economy - state.baseStats.unemployment + state.baseStats.happiness) / 40;
+  state.baseStats.population = clamp(state.baseStats.population + growth, 10, 200);
+  state.baseStats.money = clamp(
+    state.baseStats.money + (state.baseStats.population * 0.4 + state.baseStats.economy * 0.2 - 15),
+    0,
+    240
+  );
+  state.baseStats.happiness = clamp(
+    state.baseStats.happiness + (state.baseStats.environment - 60) / 20 - (state.baseStats.unemployment - 10) / 10,
+    10,
+    100
+  );
+  state.baseStats.security = clamp(
+    state.baseStats.security + (state.baseStats.unemployment < 12 ? 2 : -2),
+    10,
+    100
+  );
 
   resolvePending();
-  logMessage(`${state.year - 1}年が経過。人口成長率は${growth.toFixed(1)}。`);
+  logMessage(`${state.dynamic.year - 1}年が経過。人口成長率は${growth.toFixed(1)}。`);
   normalize();
   updateStats();
   randomEvent();
