@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>パラドゲー風ミニ都市シム</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <div>
+          <h1>ミニ都市運営シム</h1>
+          <p>数字と政策で都市を成長させよう。</p>
+        </div>
+        <div class="time-box">
+          <div class="time-label">ターン</div>
+          <div class="time-value" id="turn">1年目</div>
+          <button id="advance">1年進める</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="panel stats">
+          <h2>都市ステータス</h2>
+          <div class="stat-grid" id="stats"></div>
+          <div class="trend" id="trend"></div>
+        </section>
+
+        <section class="panel policies">
+          <h2>政策</h2>
+          <p class="hint">実行すると即時効果＋数年後の副作用が発生することがあります。</p>
+          <div class="policy-list" id="policies"></div>
+        </section>
+
+        <section class="panel events">
+          <h2>イベント</h2>
+          <div id="event-box" class="event-box empty">
+            <p>いまは静かな一年です。</p>
+          </div>
+        </section>
+      </main>
+
+      <footer>
+        <div class="log" id="log"></div>
+      </footer>
+    </div>
+
+    <template id="policy-template">
+      <button class="policy">
+        <div class="policy-title"></div>
+        <div class="policy-desc"></div>
+        <div class="policy-effect"></div>
+      </button>
+    </template>
+
+    <template id="event-template">
+      <div class="event">
+        <div class="event-title"></div>
+        <div class="event-desc"></div>
+        <div class="event-options"></div>
+      </div>
+    </template>
+
+    <template id="stat-template">
+      <div class="stat">
+        <div class="stat-label"></div>
+        <div class="stat-value"></div>
+        <div class="stat-bar">
+          <div class="stat-fill"></div>
+        </div>
+      </div>
+    </template>
+
+    <script src="script.js"></script>
+  </body>
+</html>
