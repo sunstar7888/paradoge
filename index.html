@@ -8,37 +8,49 @@
   </head>
   <body>
     <div class="app">
+      <div class="time-box">
+        <div class="time-label">ターン</div>
+        <div class="time-value" id="turn">1年目</div>
+        <button id="advance">1年進める</button>
+      </div>
       <header>
         <div>
           <h1>ミニ都市運営シム</h1>
           <p>数字と政策で都市を成長させよう。</p>
         </div>
-        <div class="time-box">
-          <div class="time-label">ターン</div>
-          <div class="time-value" id="turn">1年目</div>
-          <button id="advance">1年進める</button>
-        </div>
       </header>
 
-      <main>
-        <section class="panel stats">
-          <h2>都市ステータス</h2>
-          <div class="stat-grid" id="stats"></div>
-          <div class="trend" id="trend"></div>
-        </section>
+      <main class="columns">
+        <div class="column">
+          <section class="panel stats">
+            <h2>都市ステータス</h2>
+            <div class="stat-grid" id="stats"></div>
+            <div class="trend" id="trend"></div>
+          </section>
+        </div>
 
-        <section class="panel policies">
-          <h2>政策</h2>
-          <p class="hint">実行すると即時効果＋数年後の副作用が発生することがあります。</p>
-          <div class="policy-list" id="policies"></div>
-        </section>
+        <div class="column">
+          <section class="panel policies">
+            <h2>政策</h2>
+            <p class="hint">実行すると即時効果＋数年後の副作用が発生することがあります。</p>
+            <div class="policy-list" id="policies"></div>
+          </section>
+        </div>
 
-        <section class="panel events">
-          <h2>イベント</h2>
-          <div id="event-box" class="event-box empty">
-            <p>いまは静かな一年です。</p>
-          </div>
-        </section>
+        <div class="column">
+          <section class="panel facilities">
+            <h2>施設</h2>
+            <p class="hint">施設の効果は都市ステータスに合算されます。</p>
+            <div class="facility-list" id="facilities"></div>
+          </section>
+
+          <section class="panel events">
+            <h2>イベント</h2>
+            <div id="event-box" class="event-box empty">
+              <p>いまは静かな一年です。</p>
+            </div>
+          </section>
+        </div>
       </main>
 
       <footer>

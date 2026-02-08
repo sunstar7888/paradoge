@@ -1,20 +1,40 @@
 const state = {
-  baseStats: {
-    money: 120,
-    population: 50,
-    happiness: 60,
-    economy: 55,
-    environment: 70,
-    security: 65,
-    education: 50,
-    unemployment: 12,
-  },
-  dynamic: {
-    year: 1,
-    history: [],
-    pending: [],
-  },
+  year: 1,
+  history: [],
+  pending: [],
 };
+
+const baseStats = {
+  money: 120,
+  population: 50,
+  happiness: 60,
+  economy: 55,
+  environment: 70,
+  security: 65,
+  education: 50,
+  unemployment: 12,
+};
+
+const facilities = [
+  {
+    id: "kiyomizu",
+    name: "清水寺",
+    type: "観光",
+    effects: { happiness: +4, economy: +3 },
+  },
+  {
+    id: "first-school",
+    name: "○○第一小学校",
+    type: "教育",
+    effects: { education: +6, happiness: +2 },
+  },
+  {
+    id: "factory",
+    name: "○○株式会社",
+    type: "産業",
+    effects: { economy: +6, unemployment: -2, environment: -3 },
+  },
+];
 
 const statsConfig = [
   { key: "money", label: "財政 (億)", max: 200 },
@@ -26,8 +46,6 @@ const statsConfig = [
   { key: "education", label: "教育", max: 100 },
   { key: "unemployment", label: "失業率", max: 30, invert: true },
 ];
-
-const facilities = [];
 
 const policies = [
   {
@@ -154,6 +172,7 @@ const logEl = document.getElementById("log");
 const policiesEl = document.getElementById("policies");
 const advanceBtn = document.getElementById("advance");
 const eventBoxEl = document.getElementById("event-box");
+const facilitiesEl = document.getElementById("facilities");
 
 const statTemplate = document.getElementById("stat-template");
 const policyTemplate = document.getElementById("policy-template");
@@ -175,49 +194,31 @@ function formatStat(key, value) {
 
 function applyEffect(effect) {
   Object.entries(effect).forEach(([key, delta]) => {
-    if (!(key in state.baseStats)) return;
-    state.baseStats[key] += delta;
+    if (!(key in baseStats)) return;
+    baseStats[key] += delta;
   });
 }
 
 function scheduleDelayed(policy) {
   if (!policy.delayed) return;
-  state.dynamic.pending.push({
-    year: state.dynamic.year + policy.delayed.after,
+  state.pending.push({
+    year: state.year + policy.delayed.after,
     effect: policy.delayed.effect,
     note: policy.delayed.note,
   });
 }
 
 function logMessage(message) {
-  state.dynamic.history.unshift(message);
-  state.dynamic.history = state.dynamic.history.slice(0, 8);
-  logEl.textContent = state.dynamic.history.join("\n");
-}
-
-function calculateFacilityTotals() {
-  const totals = Object.fromEntries(statsConfig.map((stat) => [stat.key, 0]));
-  facilities.forEach((facility) => {
-    if (!facility.effects) return;
-    Object.entries(facility.effects).forEach(([key, delta]) => {
-      if (!(key in totals)) return;
-      totals[key] += delta;
-    });
-  });
-  return totals;
-}
-
-function calculateEffectiveStats() {
-  const facilityTotals = calculateFacilityTotals();
-  const effectiveStats = Object.fromEntries(
-    statsConfig.map((stat) => [stat.key, state.baseStats[stat.key] + facilityTotals[stat.key]])
-  );
-  return { effectiveStats, facilityTotals };
+  state.history.unshift(message);
+  state.history = state.history.slice(0, 8);
+  logEl.textContent = state.history.join("\n");
 }
 
 function updateStats() {
+  const facilityTotals = calculateFacilityTotals();
+  const effectiveStats = buildEffectiveStats(facilityTotals);
+
   statsEl.innerHTML = "";
-  const { effectiveStats } = calculateEffectiveStats();
   statsConfig.forEach((stat) => {
     const node = statTemplate.content.cloneNode(true);
     const value = Math.round(effectiveStats[stat.key]);
@@ -268,17 +269,62 @@ function labelFor(key) {
 }
 
 function resolvePending() {
-  const due = state.dynamic.pending.filter((item) => item.year === state.dynamic.year);
+  const due = state.pending.filter((item) => item.year === state.year);
   if (due.length === 0) return;
   due.forEach((item) => {
     applyEffect(item.effect);
     logMessage(`遅延効果: ${item.note}`);
   });
-  state.dynamic.pending = state.dynamic.pending.filter((item) => item.year !== state.dynamic.year);
+  state.pending = state.pending.filter((item) => item.year !== state.year);
+}
+
+function calculateFacilityTotals() {
+  return facilities.reduce(
+    (totals, facility) => {
+      Object.entries(facility.effects).forEach(([key, value]) => {
+        totals[key] = (totals[key] ?? 0) + value;
+      });
+      return totals;
+    },
+    {}
+  );
+}
+
+function buildEffectiveStats(facilityTotals) {
+  return Object.fromEntries(
+    Object.entries(baseStats).map(([key, value]) => [key, value + (facilityTotals[key] ?? 0)])
+  );
+}
+
+function renderFacilities() {
+  facilitiesEl.innerHTML = "";
+  facilities.forEach((facility) => {
+    const card = document.createElement("div");
+    card.className = "facility";
+
+    const name = document.createElement("div");
+    name.className = "facility-name";
+    name.textContent = facility.name;
+
+    const type = document.createElement("div");
+    type.className = "facility-type";
+    type.textContent = facility.type;
+
+    const effect = document.createElement("div");
+    effect.className = "facility-effect";
+    effect.textContent = Object.entries(facility.effects)
+      .map(([key, delta]) => `${labelFor(key)} ${delta > 0 ? "+" : ""}${delta}`)
+      .join(" / ");
+
+    card.append(name, type, effect);
+    facilitiesEl.appendChild(card);
+  });
 }
 
 function randomEvent() {
-  const candidates = events.filter((event) => event.condition(state.baseStats));
+  const facilityTotals = calculateFacilityTotals();
+  const effectiveStats = buildEffectiveStats(facilityTotals);
+  const candidates = events.filter((event) => event.condition(effectiveStats));
   if (candidates.length === 0) {
     eventBoxEl.classList.add("empty");
     eventBoxEl.innerHTML = "<p>いまは静かな一年です。</p>";
@@ -307,40 +353,32 @@ function randomEvent() {
 }
 
 function normalize() {
-  state.baseStats.money = clamp(state.baseStats.money, 0, 240);
-  state.baseStats.population = clamp(state.baseStats.population, 10, 200);
-  state.baseStats.happiness = clamp(state.baseStats.happiness, 10, 100);
-  state.baseStats.economy = clamp(state.baseStats.economy, 10, 100);
-  state.baseStats.environment = clamp(state.baseStats.environment, 10, 100);
-  state.baseStats.security = clamp(state.baseStats.security, 10, 100);
-  state.baseStats.education = clamp(state.baseStats.education, 10, 100);
-  state.baseStats.unemployment = clamp(state.baseStats.unemployment, 2, 30);
+  baseStats.money = clamp(baseStats.money, 0, 240);
+  baseStats.population = clamp(baseStats.population, 10, 200);
+  baseStats.happiness = clamp(baseStats.happiness, 10, 100);
+  baseStats.economy = clamp(baseStats.economy, 10, 100);
+  baseStats.environment = clamp(baseStats.environment, 10, 100);
+  baseStats.security = clamp(baseStats.security, 10, 100);
+  baseStats.education = clamp(baseStats.education, 10, 100);
+  baseStats.unemployment = clamp(baseStats.unemployment, 2, 30);
 }
 
 function yearTick() {
-  state.dynamic.year += 1;
-  turnEl.textContent = `${state.dynamic.year}年目`;
+  state.year += 1;
+  turnEl.textContent = `${state.year}年目`;
 
-  const growth = (state.baseStats.economy - state.baseStats.unemployment + state.baseStats.happiness) / 40;
-  state.baseStats.population = clamp(state.baseStats.population + growth, 10, 200);
-  state.baseStats.money = clamp(
-    state.baseStats.money + (state.baseStats.population * 0.4 + state.baseStats.economy * 0.2 - 15),
-    0,
-    240
-  );
-  state.baseStats.happiness = clamp(
-    state.baseStats.happiness + (state.baseStats.environment - 60) / 20 - (state.baseStats.unemployment - 10) / 10,
+  const growth = (baseStats.economy - baseStats.unemployment + baseStats.happiness) / 40;
+  baseStats.population = clamp(baseStats.population + growth, 10, 200);
+  baseStats.money = clamp(baseStats.money + (baseStats.population * 0.4 + baseStats.economy * 0.2 - 15), 0, 240);
+  baseStats.happiness = clamp(
+    baseStats.happiness + (baseStats.environment - 60) / 20 - (baseStats.unemployment - 10) / 10,
     10,
     100
   );
-  state.baseStats.security = clamp(
-    state.baseStats.security + (state.baseStats.unemployment < 12 ? 2 : -2),
-    10,
-    100
-  );
+  baseStats.security = clamp(baseStats.security + (baseStats.unemployment < 12 ? 2 : -2), 10, 100);
 
   resolvePending();
-  logMessage(`${state.dynamic.year - 1}年が経過。人口成長率は${growth.toFixed(1)}。`);
+  logMessage(`${state.year - 1}年が経過。人口成長率は${growth.toFixed(1)}。`);
   normalize();
   updateStats();
   randomEvent();
@@ -349,6 +387,7 @@ function yearTick() {
 advanceBtn.addEventListener("click", yearTick);
 
 renderPolicies();
+renderFacilities();
 updateStats();
 randomEvent();
 logMessage("都市運営を開始しました。");
